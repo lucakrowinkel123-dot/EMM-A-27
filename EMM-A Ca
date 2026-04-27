@@ -1,4 +1,4 @@
-// Carrier autopilot for EMM-A system.
+// Carrier for EMM-A system.
 //
 // ============= Commands ==============
 // Nav;GPS:Name:X:Y:Z:|Ux,Uy,Uz,Fx,Fy,Fz : set target position and orientation vectors
