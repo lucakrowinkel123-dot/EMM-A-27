@@ -1,4 +1,4 @@
-// Autominer Script
+// Autominer for EMM-A system.
 
 // ============= Commands ==============
 // Nav;GPS:Name:X:Y:Z:|Ux,Uy,Uz,Fx,Fy,Fz : sets target position and explicit up/forward vectors
