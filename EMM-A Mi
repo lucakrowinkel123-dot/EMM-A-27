@@ -270,7 +270,7 @@ public void Main (string argument, UpdateType updateSource)
         if (runtime % echoFrequency == 0)
         {
             WriteEcho();
-            SaveState();
+            SaveStateProgressOnly();
         }
 
         if (miningEnabled)
@@ -2436,6 +2436,63 @@ void SaveState()
     sb.AppendLine("dockConnectRecompileArmed=" + (dockConnectRecompileArmed ? "1" : "0"));
     sb.AppendLine("connectorOffsetLocal=" + V3ToString(connectorOffsetLocal));
     Storage = sb.ToString();
+}
+
+void SaveStateProgressOnly()
+{
+    var dict = ParseStorageKeyValues(Storage);
+
+    dict["autopilotEnabled"] = autopilotEnabled ? "1" : "0";
+    dict["hasTarget"] = hasTarget ? "1" : "0";
+    dict["targetPosition"] = V3ToString(targetPosition);
+    dict["desiredForward"] = V3ToString(desiredForward);
+    dict["desiredUp"] = V3ToString(desiredUp);
+    dict["activeMaxSpeed"] = activeMaxSpeed.ToString("R");
+
+    dict["laneDepth"] = laneDepth.ToString("R");
+    dict["retryLane"] = retryCurrentLane ? "1" : "0";
+    dict["stuckBackout"] = stuckBackout ? "1" : "0";
+    dict["stuckRetryCount"] = stuckRetryCount.ToString();
+
+    dict["pathIndex"] = pathIndex.ToString();
+    dict["pathRecordingWaitReturn"] = pathRecordingWaitReturn ? "1" : "0";
+    dict["pathRecordCounter"] = pathRecordCounter.ToString();
+    dict["pathRecordMineCounter"] = pathRecordMineCounter.ToString();
+    dict["pathRecordMineStage"] = ((int)pathRecordMineStage).ToString();
+    dict["pathRecordMeters"] = pathRecordMeters.ToString("R");
+    dict["pathRecordMineDepth"] = pathRecordMineDepth.ToString("R");
+
+    dict["dockingState"] = ((int)dockingState).ToString();
+    dict["undockRecompileTicksRemaining"] = undockRecompileTicksRemaining.ToString();
+    dict["dockMergeReadyTicks"] = dockMergeReadyTicks.ToString();
+    dict["dockConnectRetryTicks"] = dockConnectRetryTicks.ToString();
+    dict["dockConnectRecompileTicksRemaining"] = dockConnectRecompileTicksRemaining.ToString();
+    dict["dockConnectRecompileArmed"] = dockConnectRecompileArmed ? "1" : "0";
+
+    Storage = BuildStorageFromKeyValues(dict);
+}
+
+Dictionary<string, string> ParseStorageKeyValues(string data)
+{
+    var dict = new Dictionary<string, string>();
+    if (string.IsNullOrWhiteSpace(data))
+        return dict;
+
+    foreach (string line in data.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
+    {
+        int eq = line.IndexOf('=');
+        if (eq < 0) continue;
+        dict[line.Substring(0, eq).Trim()] = line.Substring(eq + 1).Trim();
+    }
+    return dict;
+}
+
+string BuildStorageFromKeyValues(Dictionary<string, string> dict)
+{
+    var sb = new StringBuilder();
+    foreach (var kv in dict)
+        sb.AppendLine(kv.Key + "=" + kv.Value);
+    return sb.ToString();
 }
 
 void LoadState()
