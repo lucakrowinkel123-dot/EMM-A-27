@@ -101,7 +101,7 @@ IMyTimerBlock _cachedPathTimer;
 IMyTimerBlock _cachedZoneDbTimer;
 
 bool goToMode = false;
-int goToStage = 0; // 1 = flying to safe side-point, 2 = final approach to saved carrier pose
+int goToStage = 0; // 1 = fly to safe side-point, 2 = align at side-point, 3 = final approach to saved carrier pose
 IMyBroadcastListener minerPathCompleteListener;
 
 enum MineSequenceState
@@ -110,6 +110,7 @@ enum MineSequenceState
     GoingTo,
     WaitingForStationary,
     WaitingMinerPathComplete,
+    AligningForDeparture,
     ReturningToFrontApproach
 }
 
@@ -689,6 +690,22 @@ void UpdateMineSequence()
         if (!minerPathCompleteReceived)
             return;
 
+        targetPosition = rc.GetPosition() + GetTargetOffsetWorld();
+        desiredForward = mineSavedForward;
+        desiredUp = mineSavedUp;
+        hasTarget = true;
+        autopilotEnabled = true;
+        activeMaxSpeed = maxSpeed;
+        mineSequenceState = MineSequenceState.AligningForDeparture;
+        Echo($"Mine: miner complete. Aligning at departure point for asteroid {mineAsteroidNum:D3}.");
+        return;
+    }
+
+    if (mineSequenceState == MineSequenceState.AligningForDeparture)
+    {
+        if (!IsAtTargetPose(targetPosition, mineSavedForward, mineSavedUp))
+            return;
+
         targetPosition = mineFrontApproachPoint;
         desiredForward = mineSavedForward;
         desiredUp = mineSavedUp;
@@ -696,7 +713,7 @@ void UpdateMineSequence()
         autopilotEnabled = true;
         activeMaxSpeed = approachPointMaxSpeed;
         mineSequenceState = MineSequenceState.ReturningToFrontApproach;
-        Echo($"Mine: miner complete. Returning to front approach point for asteroid {mineAsteroidNum:D3}.");
+        Echo($"Mine: departure point aligned. Returning to front approach point for asteroid {mineAsteroidNum:D3}.");
         return;
     }
 
@@ -1567,16 +1584,26 @@ void UpdateGoToRunner()
 
     if (goToStage == 1 && IsAtTargetPosition(targetPosition))
     {
+        desiredForward = _goToFinalForward;
+        desiredUp      = _goToFinalUp;
+        activeMaxSpeed = approachPointMaxSpeed;
+        goToStage      = 2;
+        Echo("GoTo: side-point reached. Holding position for alignment.");
+        return;
+    }
+
+    if (goToStage == 2 && IsAtTargetPose(targetPosition, _goToFinalForward, _goToFinalUp))
+    {
         targetPosition = _goToFinalPosition;
         desiredForward = _goToFinalForward;
         desiredUp      = _goToFinalUp;
         activeMaxSpeed = maxSpeed;
-        goToStage      = 2;
-        Echo("GoTo: side-point reached. Starting final approach.");
+        goToStage      = 3;
+        Echo("GoTo: side-point aligned. Starting final approach.");
         return;
     }
 
-    if (goToStage == 2 && IsAtTargetPose(_goToFinalPosition, _goToFinalForward, _goToFinalUp))
+    if (goToStage == 3 && IsAtTargetPose(_goToFinalPosition, _goToFinalForward, _goToFinalUp))
     {
         goToMode      = false;
         goToStage     = 0;
