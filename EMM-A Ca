@@ -39,6 +39,7 @@ string minerPathCompleteTag   = "EMM_A_MINER_PATH_COMPLETE";
 double broadcastForwardOffset = 1.25;
 UpdateFrequency tickSpeed     = UpdateFrequency.Update1;
 double maxSpeed               = 25;
+double approachPointMaxSpeed  = 250;
 double arrivalTolerance       = 2.5;
 double orientationToleranceDeg = 1.0;
 string pathTimerTag           = "Carrier Path";
@@ -693,7 +694,7 @@ void UpdateMineSequence()
         desiredUp = mineSavedUp;
         hasTarget = true;
         autopilotEnabled = true;
-        activeMaxSpeed = maxSpeed;
+        activeMaxSpeed = approachPointMaxSpeed;
         mineSequenceState = MineSequenceState.ReturningToFrontApproach;
         Echo($"Mine: miner complete. Returning to front approach point for asteroid {mineAsteroidNum:D3}.");
         return;
@@ -1541,6 +1542,7 @@ void HandleGoTo(string argument)
     Runtime.UpdateFrequency = tickSpeed;
     goToMode         = true;
     goToStage        = 1;
+    activeMaxSpeed   = approachPointMaxSpeed;
     pathMode         = false;
     pathPaused       = false;
     pathPausedNavResume = false;
@@ -1568,6 +1570,7 @@ void UpdateGoToRunner()
         targetPosition = _goToFinalPosition;
         desiredForward = _goToFinalForward;
         desiredUp      = _goToFinalUp;
+        activeMaxSpeed = maxSpeed;
         goToStage      = 2;
         Echo("GoTo: side-point reached. Starting final approach.");
         return;
@@ -1577,6 +1580,7 @@ void UpdateGoToRunner()
     {
         goToMode      = false;
         goToStage     = 0;
+        activeMaxSpeed = 0;
         Echo("GoTo: final pose reached.");
     }
 }
