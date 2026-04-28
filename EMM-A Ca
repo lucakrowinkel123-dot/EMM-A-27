@@ -102,6 +102,7 @@ IMyTimerBlock _cachedZoneDbTimer;
 
 bool goToMode = false;
 int goToStage = 0; // 1 = fly to safe side-point, 2 = align at side-point, 3 = final approach to saved carrier pose
+int goToAlignTicks = 0;
 IMyBroadcastListener minerPathCompleteListener;
 
 enum MineSequenceState
@@ -470,6 +471,7 @@ void RemoteCommand(string command)
             desiredUp           = Vector3D.Zero;
             goToMode            = false;
             goToStage           = 0;
+            goToAlignTicks      = 0;
             mineSequenceState   = MineSequenceState.None;
             mineAsteroidNum     = 0;
             minerPathCompleteReceived = false;
@@ -696,6 +698,7 @@ void UpdateMineSequence()
         hasTarget = true;
         autopilotEnabled = true;
         activeMaxSpeed = maxSpeed;
+        mineStationaryTicks = 0;
         mineSequenceState = MineSequenceState.AligningForDeparture;
         Echo($"Mine: miner complete. Aligning at departure point for asteroid {mineAsteroidNum:D3}.");
         return;
@@ -703,7 +706,14 @@ void UpdateMineSequence()
 
     if (mineSequenceState == MineSequenceState.AligningForDeparture)
     {
-        if (!IsAtTargetPose(targetPosition, mineSavedForward, mineSavedUp))
+        bool atPose = IsAtTargetPose(targetPosition, mineSavedForward, mineSavedUp);
+        double speed = rc.GetShipVelocities().LinearVelocity.Length();
+        if (atPose && speed <= Math.Max(0, mineStationarySpeedMps))
+            mineStationaryTicks++;
+        else
+            mineStationaryTicks = 0;
+
+        if (mineStationaryTicks < Math.Max(1, mineStationaryConfirmTicks))
             return;
 
         targetPosition = mineFrontApproachPoint;
@@ -711,7 +721,8 @@ void UpdateMineSequence()
         desiredUp = mineSavedUp;
         hasTarget = true;
         autopilotEnabled = true;
-        activeMaxSpeed = approachPointMaxSpeed;
+        activeMaxSpeed = maxSpeed;
+        mineStationaryTicks = 0;
         mineSequenceState = MineSequenceState.ReturningToFrontApproach;
         Echo($"Mine: departure point aligned. Returning to front approach point for asteroid {mineAsteroidNum:D3}.");
         return;
@@ -1559,6 +1570,7 @@ void HandleGoTo(string argument)
     Runtime.UpdateFrequency = tickSpeed;
     goToMode         = true;
     goToStage        = 1;
+    goToAlignTicks   = 0;
     activeMaxSpeed   = approachPointMaxSpeed;
     pathMode         = false;
     pathPaused       = false;
@@ -1588,17 +1600,29 @@ void UpdateGoToRunner()
         desiredUp      = _goToFinalUp;
         activeMaxSpeed = approachPointMaxSpeed;
         goToStage      = 2;
+        goToAlignTicks = 0;
         Echo("GoTo: side-point reached. Holding position for alignment.");
         return;
     }
 
-    if (goToStage == 2 && IsAtTargetPose(targetPosition, _goToFinalForward, _goToFinalUp))
+    if (goToStage == 2)
     {
+        bool atPose = IsAtTargetPose(targetPosition, _goToFinalForward, _goToFinalUp);
+        double speed = rc.GetShipVelocities().LinearVelocity.Length();
+        if (atPose && speed <= Math.Max(0, mineStationarySpeedMps))
+            goToAlignTicks++;
+        else
+            goToAlignTicks = 0;
+
+        if (goToAlignTicks < Math.Max(1, mineStationaryConfirmTicks))
+            return;
+
         targetPosition = _goToFinalPosition;
         desiredForward = _goToFinalForward;
         desiredUp      = _goToFinalUp;
         activeMaxSpeed = maxSpeed;
         goToStage      = 3;
+        goToAlignTicks = 0;
         Echo("GoTo: side-point aligned. Starting final approach.");
         return;
     }
@@ -1607,6 +1631,7 @@ void UpdateGoToRunner()
     {
         goToMode      = false;
         goToStage     = 0;
+        goToAlignTicks = 0;
         activeMaxSpeed = 0;
         Echo("GoTo: final pose reached.");
     }
