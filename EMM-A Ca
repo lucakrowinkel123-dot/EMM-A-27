@@ -101,7 +101,7 @@ IMyTimerBlock _cachedPathTimer;
 IMyTimerBlock _cachedZoneDbTimer;
 
 bool goToMode = false;
-int goToStage = 0; // 1 = fly to safe side-point, 2 = align at side-point, 3 = final approach to saved carrier pose
+int goToStage = 0; // 1 = hold and align toward side-point, 2 = fly to safe side-point, 3 = align at side-point, 4 = final approach to saved carrier pose
 int goToAlignTicks = 0;
 IMyBroadcastListener minerPathCompleteListener;
 
@@ -1562,16 +1562,22 @@ void HandleGoTo(string argument)
     }
 
     Vector3D chosenPoint = frontIntersects ? backPoint : frontPoint;
-    targetPosition   = chosenPoint;
-    desiredForward   = Vector3D.Zero;
-    desiredUp        = savedUp;
+    Vector3D approachForward = chosenPoint - currentPos;
+    if (approachForward.LengthSquared() < 0.001)
+        approachForward = savedForward;
+    else
+        approachForward.Normalize();
+
+    targetPosition   = currentPos;
+    desiredForward   = approachForward;
+    desiredUp        = Vector3D.Zero;
     hasTarget        = true;
     autopilotEnabled = true;
     Runtime.UpdateFrequency = tickSpeed;
     goToMode         = true;
     goToStage        = 1;
     goToAlignTicks   = 0;
-    activeMaxSpeed   = approachPointMaxSpeed;
+    activeMaxSpeed   = maxSpeed;
     pathMode         = false;
     pathPaused       = false;
     pathPausedNavResume = false;
@@ -1581,31 +1587,58 @@ void HandleGoTo(string argument)
     _goToFinalPosition = savedPos;
     _goToFinalForward  = savedForward;
     _goToFinalUp       = savedUp;
+    _goToSidePoint     = chosenPoint;
+    _goToApproachForward = approachForward;
 
     Echo($"GoTo: Asteroid {asteroidNum:D3} using {(frontIntersects ? "rear" : "front")} approach point.");
+    Echo("GoTo: holding position and aligning toward side-point.");
 }
 
 Vector3D _goToFinalPosition = Vector3D.Zero;
 Vector3D _goToFinalForward  = Vector3D.Zero;
 Vector3D _goToFinalUp       = Vector3D.Zero;
+Vector3D _goToSidePoint     = Vector3D.Zero;
+Vector3D _goToApproachForward = Vector3D.Zero;
 
 void UpdateGoToRunner()
 {
     if (!goToMode || !autopilotEnabled || !hasTarget)
         return;
 
-    if (goToStage == 1 && IsAtTargetPosition(targetPosition))
+    if (goToStage == 1)
+    {
+        bool atPose = IsAtTargetPose(targetPosition, _goToApproachForward, Vector3D.Zero);
+        double speed = rc.GetShipVelocities().LinearVelocity.Length();
+        if (atPose && speed <= Math.Max(0, mineStationarySpeedMps))
+            goToAlignTicks++;
+        else
+            goToAlignTicks = 0;
+
+        if (goToAlignTicks < Math.Max(1, mineStationaryConfirmTicks))
+            return;
+
+        targetPosition = _goToSidePoint;
+        desiredForward = _goToApproachForward;
+        desiredUp      = _goToFinalUp;
+        activeMaxSpeed = approachPointMaxSpeed;
+        goToStage      = 2;
+        goToAlignTicks = 0;
+        Echo("GoTo: alignment complete. Moving to side-point.");
+        return;
+    }
+
+    if (goToStage == 2 && IsAtTargetPosition(targetPosition))
     {
         desiredForward = _goToFinalForward;
         desiredUp      = _goToFinalUp;
         activeMaxSpeed = approachPointMaxSpeed;
-        goToStage      = 2;
+        goToStage      = 3;
         goToAlignTicks = 0;
         Echo("GoTo: side-point reached. Holding position for alignment.");
         return;
     }
 
-    if (goToStage == 2)
+    if (goToStage == 3)
     {
         bool atPose = IsAtTargetPose(targetPosition, _goToFinalForward, _goToFinalUp);
         double speed = rc.GetShipVelocities().LinearVelocity.Length();
@@ -1621,13 +1654,13 @@ void UpdateGoToRunner()
         desiredForward = _goToFinalForward;
         desiredUp      = _goToFinalUp;
         activeMaxSpeed = maxSpeed;
-        goToStage      = 3;
+        goToStage      = 4;
         goToAlignTicks = 0;
         Echo("GoTo: side-point aligned. Starting final approach.");
         return;
     }
 
-    if (goToStage == 3 && IsAtTargetPose(_goToFinalPosition, _goToFinalForward, _goToFinalUp))
+    if (goToStage == 4 && IsAtTargetPose(_goToFinalPosition, _goToFinalForward, _goToFinalUp))
     {
         goToMode      = false;
         goToStage     = 0;
