@@ -1570,7 +1570,7 @@ void HandleGoTo(string argument)
 
     targetPosition   = currentPos;
     desiredForward   = approachForward;
-    desiredUp        = savedUp;
+    desiredUp        = Vector3D.Zero;
     hasTarget        = true;
     autopilotEnabled = true;
     Runtime.UpdateFrequency = tickSpeed;
@@ -1607,7 +1607,7 @@ void UpdateGoToRunner()
 
     if (goToStage == 1)
     {
-        bool atPose = IsAtTargetPose(targetPosition, _goToApproachForward, _goToFinalUp);
+        bool atPose = IsAtTargetPose(targetPosition, _goToApproachForward, Vector3D.Zero);
         double speed = rc.GetShipVelocities().LinearVelocity.Length();
         if (atPose && speed <= Math.Max(0, mineStationarySpeedMps))
             goToAlignTicks++;
